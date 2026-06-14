@@ -99,11 +99,17 @@ function NavLinks({ user, onNavigate }: { user: ShellUser; onNavigate?: () => vo
 
 function Brand() {
   return (
-    <Link href="/" className="flex items-center gap-2.5 px-5 py-4">
-      <Image src="/shutis-logo.svg" alt="ШУТИС" width={32} height={37} priority />
-      <div className="leading-tight">
-        <div className="text-sm font-bold text-primary">ШУТИС</div>
-        <div className="text-[11px] text-muted-foreground">Санал хураал</div>
+    <Link href="/" className="block px-4 py-4">
+      <Image
+        src="/shutis-logo.png"
+        alt="ШУТИС — Монгол Улсын Шинжлэх Ухаан Технологийн Их Сургууль"
+        width={2255}
+        height={396}
+        priority
+        className="h-auto w-full"
+      />
+      <div className="mt-1.5 text-center text-[11px] font-medium text-muted-foreground">
+        Санал хураалын систем
       </div>
     </Link>
   );

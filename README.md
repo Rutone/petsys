@@ -17,7 +17,7 @@
 
 ## Технологи
 
-Next.js 16 (App Router) · TypeScript · Prisma 7 + SQLite · Auth.js (NextAuth v5) · Tailwind CSS 4 + shadcn/ui · zod · nodemailer · next-themes · lucide-react
+Next.js 16 (App Router) · TypeScript · Prisma 7 + libSQL/Turso (SQLite) · Auth.js (NextAuth v5) · Tailwind CSS 4 + shadcn/ui · zod · nodemailer · @vercel/blob · next-themes · lucide-react
 
 ## Ажиллуулах
 
@@ -41,17 +41,25 @@ npm run dev              # http://localhost:3000
 > Dev горимд имэйл (баталгаажуулах код, нууц үг сэргээх холбоос, мэдэгдэл) нь жинхэнэ
 > имэйл рүү илгээгдэхгүй, `npm run dev` ажиллаж буй **терминалын консол** дээр хэвлэгдэнэ.
 
-## Production тохиргоо
+## Vercel дээр deploy хийх
 
-`.env` дотор дараахыг тохируулна:
+Орчны хувьсагчдыг [.env.example](.env.example)-аас харна уу: `AUTH_SECRET`, `APP_URL`, `DATABASE_URL`,
+`TURSO_AUTH_TOKEN`, `BLOB_READ_WRITE_TOKEN`, (заавал биш) `SMTP_*`.
 
-- `AUTH_SECRET` — Auth.js нууц түлхүүр (заавал)
-- `APP_URL` — сайтын үндсэн URL (нууц үг сэргээх холбоост ашиглана)
-- `DATABASE_URL` — SQLite (`file:./dev.db`) эсвэл PostgreSQL руу шилжүүлж болно
-- **SMTP** (имэйл бодитоор илгээх): `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `SMTP_SECURE`
+1. **Turso DB үүсгэх** ([turso.tech](https://turso.tech)) → DB-ийн URL (`libsql://…`) ба auth token авах.
+2. **Схем + seed суулгах** (нэг удаа, локалаас алсын Turso руу):
+   ```bash
+   # PowerShell:
+   $env:DATABASE_URL="libsql://<...>.turso.io"; $env:TURSO_AUTH_TOKEN="<token>"
+   npx tsx scripts/apply-schema.ts   # хүснэгтүүд үүсгэх
+   npm run db:seed                   # админ, модератор, категори
+   ```
+3. **Vercel** дээр GitHub repo-г import хийх → Environment Variables-д дээрх утгуудыг оруулах.
+4. **Vercel Blob** store нэмэх (Storage таб) → `BLOB_READ_WRITE_TOKEN` автоматаар тохирно (файл хавсралтад).
+5. Deploy → `https://<project>.vercel.app`.
 
-> Файл хавсралт нь `public/uploads`-д хадгалагдана. Vercel serverless дээр диск тогтворгүй тул
-> production-д [src/lib/upload.ts](src/lib/upload.ts)-ийг Vercel Blob / S3 руу залгахыг зөвлөнө.
+> Файл хавсралт: `BLOB_READ_WRITE_TOKEN` тохируулсан бол Vercel Blob, эс бөгөөс (dev) `public/uploads`
+> локал дискэнд хадгална — [src/lib/upload.ts](src/lib/upload.ts).
 
 ## Хугацааны төлөвлөгөө
 

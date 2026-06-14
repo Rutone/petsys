@@ -2,9 +2,9 @@ import { randomUUID } from "crypto";
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 
-// Файл хавсаргалт (q16). Локал диск рүү (public/uploads) хадгална.
-// ТЭМДЭГЛЭЛ: Vercel serverless дээр диск тогтворгүй тул production-д
-// Vercel Blob / S3 руу залгахад энэ функцийг солино.
+// Файл хавсаргалт (q16).
+//   Production (Vercel): BLOB_READ_WRITE_TOKEN тохируулсан бол Vercel Blob руу хадгална.
+//   Local dev: токен байхгүй бол public/uploads локал диск рүү хадгална.
 
 export const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 export const MAX_FILES = 3;
@@ -28,6 +28,22 @@ export async function saveUpload(file: File): Promise<SavedFile> {
 
   const ext = path.extname(file.name) || "";
   const safe = `${randomUUID()}${ext}`;
+
+  // Vercel Blob (production)
+  if (process.env.BLOB_READ_WRITE_TOKEN) {
+    const { put } = await import("@vercel/blob");
+    const blob = await put(`uploads/${safe}`, file, {
+      access: "public",
+      contentType: file.type,
+    });
+    return { url: blob.url, filename: file.name, mimeType: file.type, size: file.size };
+  }
+
+  // Локал диск (dev). Production-д Blob тохируулаагүй бол алдаа өгнө.
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Файл хавсаргах үйлчилгээ одоогоор боломжгүй байна. Дараа дахин оролдоно уу.");
+  }
+
   const dir = path.join(process.cwd(), "public", "uploads");
   await mkdir(dir, { recursive: true });
   const buffer = Buffer.from(await file.arrayBuffer());
