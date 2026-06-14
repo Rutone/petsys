@@ -1,0 +1,248 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// SQLite enum дэмждэггүй тул String талбар ашиглана. Боломжит утгууд:
+//   User.userType : STUDENT | TEACHER | STAFF
+//   User.role     : USER | MODERATOR | ADMIN
+//   Petition.status / Poll.status :
+//       PENDING | APPROVED | REJECTED | DISCUSSING | IN_PROGRESS | RESOLVED | CLOSED
+//   audience      : ALL | STUDENT | TEACHER | STAFF
+//   Organization.type : STUDENT_COUNCIL | CLUB | DEPARTMENT | OFFICE | OTHER
+
+model User {
+  id            String   @id @default(cuid())
+  name          String
+  userType      String   @default("STUDENT")
+  code          String   @unique // оюутны / багшийн / ажилтны код
+  email         String   @unique
+  passwordHash  String
+  role          String   @default("USER")
+  emailVerified Boolean  @default(false)
+  isActive      Boolean  @default(true) // идэвхтэй суралцаж/ажиллаж буй эсэх (q8)
+  isBlocked     Boolean  @default(false) // админ блоклосон эсэх (q41)
+  avatarUrl     String?
+  school        String? // бүрэлдэхүүн сургууль
+  department    String? // тэнхим / алба
+  course        Int? // курс (зөвхөн оюутан)
+  // Scoped admin/moderator (q14) — null бол бүх хүрээнд эрхтэй
+  scopeSchool   String?
+  createdAt     DateTime @default(now())
+
+  verificationCodes  VerificationCode[]
+  passwordResetTokens PasswordResetToken[]
+  petitions          Petition[]
+  signatures         Signature[]
+  polls              Poll[]
+  votes              Vote[]
+  comments           Comment[]
+  commentLikes       CommentLike[]
+  notifications      Notification[]
+  auditLogs          AuditLog[]           @relation("AuditActor")
+  organizationMembers OrganizationMember[]
+}
+
+model VerificationCode {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  code      String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+}
+
+model Category {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  slug      String     @unique
+  order     Int        @default(0)
+  petitions Petition[]
+}
+
+model Organization {
+  id        String               @id @default(cuid())
+  name      String
+  type      String               @default("OTHER")
+  verified  Boolean              @default(true)
+  createdAt DateTime             @default(now())
+  members   OrganizationMember[]
+  petitions Petition[]
+  polls     Poll[]
+}
+
+model OrganizationMember {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@unique([organizationId, userId])
+}
+
+model Petition {
+  id           String    @id @default(cuid())
+  title        String
+  description  String
+  goal         Int? // босго тоог модератор/админ зөвшөөрөхдөө тогтооно (q: institution decides)
+  status       String    @default("PENDING")
+  audience     String    @default("ALL")
+  rejectReason String?
+  // Албан хариу (q22)
+  officialResponse     String?
+  officialResponseAt   DateTime?
+  // Давхардсан өргөдөл холбох (q25)
+  relatedToId  String?
+  relatedTo    Petition?  @relation("PetitionRelation", fields: [relatedToId], references: [id])
+  related      Petition[] @relation("PetitionRelation")
+
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id])
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+
+  authorId  String
+  author    User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  closesAt  DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  signatures  Signature[]
+  comments    Comment[]
+  attachments Attachment[]
+}
+
+model Attachment {
+  id         String   @id @default(cuid())
+  petitionId String
+  petition   Petition @relation(fields: [petitionId], references: [id], onDelete: Cascade)
+  url        String
+  filename   String
+  mimeType   String
+  size       Int
+  createdAt  DateTime @default(now())
+}
+
+model Signature {
+  id         String   @id @default(cuid())
+  petitionId String
+  petition   Petition @relation(fields: [petitionId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([petitionId, userId])
+}
+
+model Poll {
+  id           String    @id @default(cuid())
+  question     String
+  description  String
+  status       String    @default("PENDING")
+  audience     String    @default("ALL")
+  rejectReason String?
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+
+  authorId  String
+  author    User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  endsAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  options  PollOption[]
+  votes    Vote[]
+  comments Comment[]
+}
+
+model PollOption {
+  id     String @id @default(cuid())
+  pollId String
+  poll   Poll   @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  text   String
+
+  votes Vote[]
+}
+
+model Vote {
+  id        String     @id @default(cuid())
+  pollId    String
+  poll      Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  optionId  String
+  option    PollOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime   @default(now())
+
+  @@unique([pollId, userId])
+}
+
+model Comment {
+  id         String    @id @default(cuid())
+  body       String
+  authorId   String
+  author     User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  petitionId String?
+  petition   Petition? @relation(fields: [petitionId], references: [id], onDelete: Cascade)
+  pollId     String?
+  poll       Poll?     @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now())
+
+  likes CommentLike[]
+}
+
+model CommentLike {
+  id        String   @id @default(cuid())
+  commentId String
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([commentId, userId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  body      String
+  link      String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, read])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String
+  actor      User     @relation("AuditActor", fields: [actorId], references: [id], onDelete: Cascade)
+  action     String // SIGN | UNSIGN | VOTE | APPROVE_PETITION | REJECT_PETITION | ...
+  entityType String // PETITION | POLL | COMMENT | USER
+  entityId   String
+  detail     String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorId])
+}
